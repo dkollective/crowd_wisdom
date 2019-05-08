@@ -3,7 +3,8 @@ import json
 from threading import Thread
 from time import sleep
 
-from groupprediction import GroupPrediction
+from dialogs import create_question
+# from groupprediction import GroupPrediction
 from team import Team, oauth
 from flask import Flask, request, make_response, render_template, jsonify
 
@@ -40,24 +41,35 @@ def thanks():
     return render_template("thanks.html")
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    """
+    This route is called by Slack after the user installs our app. It will
+    exchange the temporary authorization code Slack sends for an OAuth token
+    which we'll save on the bot object to use later.
+    To let the user know what's happened it will also render a thank you page.
+    """
+    return render_template("health.html")
+
+
 @app.route("/action", methods=["POST", "GET"])
 def handle_action():
     action = json.loads(request.form['payload'])
     print(action)
-    callback_id = action['callback_id']
-    function_name, function_id, action_name, action_id = callback_id.split('#')
-    if function_name == 'GD':
-        thread = Thread(
-            target=gds[function_id].action, args=(action_name, action_id, action))
-        thread.start()
+    # callback_id = action['callback_id']
+    # function_name, function_id, action_name, action_id = callback_id.split('#')
+    # if function_name == 'GD':
+    #     thread = Thread(
+    #         target=gds[function_id].action, args=(action_name, action_id, action))
+    #     thread.start()
     return make_response('', 200)
 
 
-def start_prediction(team, channel):
-    sleep(0)
-    global gds
-    gd = GroupPrediction(team=team, channel=channel)
-    gds[gd.id] = gd
+# def start_prediction(team, channel):
+#     sleep(0)
+#     global gds
+#     # gd = GroupPrediction(team=team, channel=channel)
+#     gds[gd.id] = gd
 
 
 @app.route("/decide", methods=["POST", "GET"])
@@ -65,14 +77,18 @@ def decide():
     team_id = request.form.get('team_id')
     channel_id = request.form.get('channel_id')
     team = Team(team_id)
-    thread = Thread(target=start_prediction, args=(team, channel_id))
-    thread.start()
+    # thread = Thread(target=start_prediction, args=(team, channel_id))
+    # thread.start()
+
+    blocks = create_question('Which pill is he going to take', ['Blue', 'Red'])
+
     data = {
-        "response_type": "ephemeral",
-        "text": f"You started a group prediction.",
-        "attachments": [
-        ]
+        "response_type": "in_channel",
+        # "text": f"You started a group prediction.",
+        "blocks": blocks
     }
+    # print(data)
+
     return jsonify(data)
 
 

@@ -55,6 +55,7 @@ def health():
 @app.route("/action", methods=["POST", "GET"])
 def handle_action():
     action = json.loads(request.form['payload'])
+
     print(action)
     # callback_id = action['callback_id']
     # function_name, function_id, action_name, action_id = callback_id.split('#')
@@ -80,7 +81,25 @@ def decide():
     # thread = Thread(target=start_prediction, args=(team, channel_id))
     # thread.start()
 
-    blocks = create_question('Which pill is he going to take', ['Blue', 'Red'])
+    steps = {
+        'INITIAL_GUESS': {'status': 'ACTIVE', 'user': []},
+        'SELECT_PEARS': {'status': 'INACTIVE', 'user': []},
+        'VIEW_INTERMEDIATE': {'status': 'INACTIVE', 'user': []},
+        'REVIESE_GUESS': {'status': 'INACTIVE', 'user': []},
+    }
+
+    # outcomes = [
+    #     {
+    #         'id': o,
+    #         'name': o,
+    #         'options': [{
+    #             'value': f"{i*5}", 'text': f"{i*5} %", 'inital_user': [], 'revised_user': []
+    #         } for i in range(21)]
+    #     }
+    #     for o in options
+    # ]
+
+    blocks = create_question('Which pill is he going to take?', ['Blue', 'Red'], steps)
 
     data = {
         "response_type": "in_channel",

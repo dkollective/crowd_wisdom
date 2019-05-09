@@ -17,53 +17,6 @@ oauth = {
 verification = os.environ.get("VERIFICATION_TOKEN")
 
 
-def post_message(team, channel, blocks, thread_ts=None):
-    t = Team(team)
-    resp = t.api_call(
-        "chat.postMessage",
-        blocks=blocks,
-        channel=channel,
-        thread_ts=thread_ts
-    )
-    import ipdb; ipdb.set_trace()
-    return resp['ts']
-
-
-def post_emessage(team, user, channel, blocks, thread_ts=None):
-    t = Team(team)
-    t.api_call(
-        "chat.postEphemeral",
-        user=user,
-        blocks=blocks,
-        channel=channel,
-        thread_ts=thread_ts
-    )
-
-
-def update_message(team, channel, message_ts, blocks):
-    t = Team(team)
-    t.api_call(
-        "chat.update",
-        blocks=blocks,
-        channel=channel,
-        ts=message_ts
-    )
-
-
-def delete_message(team, channel, message_ts):
-    t = Team(team)
-    t.api_call(
-        "chat.delete",
-        channel=channel,
-        ts=message_ts
-    )
-
-
-def get_channel_member(team, channel):
-    t = Team(team)
-    return t.get_channel_member(channel)
-
-
 class Team:
     def __init__(self, team_id):
         team_data = db["authed_teams"].find_one({'team_id': team_id})

@@ -23,21 +23,24 @@ def post_message(team, channel, blocks, thread_ts=None):
         "chat.postMessage",
         blocks=blocks,
         channel=channel,
-        thread_ts=thread_ts
+        **({'thread_ts': thread_ts} if thread_ts else {})
     )
-    import ipdb; ipdb.set_trace()
     return resp['ts']
 
 
-def post_emessage(team, user, channel, blocks, thread_ts=None):
+def post_emessage(team, channel, user, blocks, thread_ts=None):
     t = Team(team)
-    t.api_call(
+    print(team, channel, user, blocks, thread_ts)
+    resp = t.api_call(
         "chat.postEphemeral",
+        # "chat.postMessage",
         user=user,
         blocks=blocks,
         channel=channel,
-        thread_ts=thread_ts
+        **({'thread_ts': thread_ts} if thread_ts else {})
     )
+    print(resp)
+    return resp['message_ts']
 
 
 def update_message(team, channel, message_ts, blocks):

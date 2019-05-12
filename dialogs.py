@@ -3,9 +3,11 @@
 # ========== general ===========
 
 
-def _create_select(text, options):
-    option_objs = [
-        {
+def _create_select(placeholder, action_id, options):
+    option_objs = []
+    initial_option = {}
+    for o in options:
+        option = {
             "text": {
                 "type": "plain_text",
                 "text": o['text'],
@@ -13,16 +15,21 @@ def _create_select(text, options):
             },
             "value": o['value'],
         }
-        for o in options
-    ]
+        option_objs.append(option)
+        if o.get('selected'):
+            assert not initial_option, 'Only one option can be selected.'
+            initial_option = {"initial_option": option}
+
     return {
             "type": "static_select",
             "placeholder": {
                 "type": "plain_text",
-                "text": text,
+                "text": placeholder,
                 "emoji": True
             },
-            "options": option_objs
+            "action_id": action_id,
+            "options": option_objs,
+            **initial_option
     }
 
 
@@ -35,7 +42,7 @@ _divider = {
 }
 
 
-def _create_button(button_text, button_value):
+def _create_button(button_text, button_value, action_id=None):
     return {
         "type": "button",
         "text": {
@@ -43,19 +50,36 @@ def _create_button(button_text, button_value):
             "text": button_text,
             "emoji": True
         },
-        "value": button_value
+        "value": button_value,
+        **({"action_id": action_id} if action_id else {})
     }
 
 
 def _create_submit_fooder(step_id):
     return {
+        "type": "actions",
+        "elements": [_create_button('Submit', step_id + "_SUBMIT", 'SUBMIT')]
+    }
+
+
+def _create_text_block(text, accessory=None):
+    return {
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": ""
+            "text": text
         },
-        'accessory': _create_button('Submit', step_id + "_SUBMIT")
+        **({"accessory": accessory} if accessory else {})
     }
+
+
+# def _create_submit_fooder2(step_id):
+#     select = ['A', 'B']
+#     select = [{'value':s , 'text': s}for s in select]
+#     return {
+#         "type": "actions",
+#         "elements": [_create_button('Submit2', step_id + "_SUBMIT2"), _create_select('test',select)]
+#     }
 
 
 # ==== main message =============
@@ -63,17 +87,19 @@ def _create_submit_fooder(step_id):
 def _create_step_status_section(step_id, status, user):
     if len(user) == 0:
         p_str = 'Noone responded yet'
-    elif len(user) < 5:
-        p_str = _join_comma_andor([f'<@{p}>' for p in user]) + " responded"
+    elif len(user) == 1:
+        p_str = f'<@{user[0]}>'
+    elif len(user) <= 3:
+        p_str = _join_comma_andor([f'<@{p}>' for p in user])
     else:
-        p_str = f'<@{user[0]}>, <@{user[1]}> and {len(user) - 2} others responded'
+        p_str = f'<@{user[0]}>, <@{user[1]}> and {len(user) - 2} others'
 
     text_templates = {
         'INITIAL_GUESS': {
             'ACTIVE': f'*1. Give a first guess.* _({p_str})_',
             'FINISHED': f'_1. Give a first guess._ _({p_str})_',
         },
-        'SELECT_PEARS': {
+        'SELECT_PEERS': {
             'INACTIVE': '2. Select peers.',
             'ACTIVE': '*2. Select peers.*',
             'FINISHED': '_2. Select peers._',
@@ -98,7 +124,7 @@ def _create_step_status_section(step_id, status, user):
 
 
 def _create_status_block(steps):
-    order = ['INITIAL_GUESS', 'SELECT_PEARS', 'VIEW_INTERMEDIATE', 'REVIESE_GUESS']
+    order = ['INITIAL_GUESS', 'SELECT_PEERS', 'VIEW_INTERMEDIATE', 'REVIESE_GUESS']
     return [
         {
             "type": "section",
@@ -108,14 +134,12 @@ def _create_status_block(steps):
 
 
 def _create_menu_section(steps):
-    actions = [_create_button('Resend menu to thread', 'REOPEN')]
-    if steps["INITIAL_GUESS"]["status"] == 'ACTIVE':
-        actions.append(_create_button('Creator: Finish round', 'FINISH_INITAL_GUESS'))
-    elif steps["REVIESE_GUESS"]["status"] == 'ACTIVE':
-        actions.append(_create_button('Creator: Finish round', 'FINISH_REVIESE_GUESS'))
     return {
-        "type": "actions",
-        "elements": actions,
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"Follow the thread to join this group prediction."
+        }
     }
 
 
@@ -134,7 +158,7 @@ def _create_question_header(question, outcomes):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"{outcomes_str}? Follow the thread to take part."
+                "text": f"{outcomes_str}? Guess the likelihood of these outcomes."
             }
         },
     ]
@@ -165,11 +189,11 @@ def create_question(question, outcomes, steps):
 # ------------------ guess message
 
 
-def _create_guess_header(step_id):
-    if step_id == 'INITIAL_GUESS':
-        text = "* Make a first guess for the likelihood of the following outcomes *"
-    elif step_id == 'REVISE_GUESS':
-        text = "* Revise your guess for likelihood of the following outcomes *"
+def _create_guess_header(message_name):
+    if message_name == 'INITIAL_GUESS':
+        text = "*Make a first guess for the likelihood of the following outcomes*"
+    elif message_name == 'REVISE_GUESS':
+        text = "*Revise your guess for likelihood of the following outcomes*"
     return {
         "type": "section",
         "text": {
@@ -179,38 +203,38 @@ def _create_guess_header(step_id):
     }
 
 
-def _create_guess_section(outcome):
-    choices = [{'value': f"{i*5}", 'text': f"{i*5} %"} for i in range(21)]
-
+def _create_guess_section(outcome_id, outcome_name, options):
     return {
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": outcome
+            "text": outcome_name
         },
-        "accessory": _create_select("Select outcome probability", choices)
+        "accessory": _create_select("Select outcome probability", outcome_id, options)
     }
 
 
 def _create_guess_block(outcomes):
-    return [_create_guess_section(o) for o in outcomes]
+    return [_create_guess_section(**o) for o in outcomes]
 
 
-def create_guess_message(outcomes, step_id):
+def create_guess_message(message_name, outcomes, total_sum=0):
     return [
-        _create_guess_header(step_id),
+        _create_guess_header(message_name),
         _divider,
         *_create_guess_block(outcomes),
         _divider,
-        _create_submit_fooder(step_id)
+        *create_guess_info_message(total_sum),
+        _divider,
+        _create_submit_fooder(message_name)
     ]
 
 
 # ------------------ guess info message
 
 def create_guess_info_message(sum_guess):
-    if sum_guess != 1:
-        text = 'Procentages need to sum up to 100%. Current total: "{0.0%}"'.format(sum_guess)
+    if sum_guess != 100:
+        text = f'Procentages need to sum up to 100%. Current total: {sum_guess}%'
     else:
         text = 'Great. Procentages are adding up to 100%.'
     return [
@@ -220,7 +244,6 @@ def create_guess_info_message(sum_guess):
                 "type": "mrkdwn",
                 "text": text
             },
-            "accessory": _create_button('Ok', 'GUESS_INFO_CLOSE')
         }
     ]
 
@@ -253,20 +276,21 @@ def _create_select_peers_header(n_peers):
 
 
 def _create_select_peers_block(n_peers, participants):
-    text = 'Select trusted members.'
+    text = 'Select peers.'
+    options = [{'value': p, 'text': f'<@{p}>'} for p in participants]
     return {
         "type": "actions",
-        "elements": [create_select(text, participants) for i in range(n_peers)]
+        "elements": [_create_select(text, f'PEER_{i}', options) for i in range(n_peers)]
     }
 
 
 def create_peer_select_message(n_peers, participants):
     return [
-        _create_select_peers_header(n_peers),
+        _create_text_block(f"*Select {n_peers} members you trust most.*"),
         _divider,
         _create_select_peers_block(n_peers, participants),
         _divider,
-        _create_submit_fooder("SELECT_PEARS")
+        _create_submit_fooder("SELECT_PEERS")
     ]
 
 
@@ -275,9 +299,9 @@ def create_peer_select_message(n_peers, participants):
 
 def _create_outcome_header(step_id):
     if step_id == 'INITIAL_GUESS':
-        text = "* Prediction from the initial guess. *"
+        text = "*Predictions from the initial guess.*"
     elif step_id == 'REVISE_GUESS':
-        text = "* Prediction from the revised guess. *"
+        text = "*Predictions from the revised guess.*"
     return {
         "type": "section",
         "text": {
@@ -288,7 +312,7 @@ def _create_outcome_header(step_id):
 
 
 def _create_debug_outcome_string(d):
-    return ','.join(["{}: {:0%}".format(k, v) for k, v in d])
+    return ','.join([f"{k}: {v}%" for k, v in d.items()])
 
 
 # intermediate solution
@@ -342,3 +366,59 @@ def create_error_peers_selection(n_peers):
             "accessory": _create_button('Ok', 'ERROR_PEERS_CLOSE')
         }
     ]
+
+
+# ------------------ open thread
+
+open_thread = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "We encourage you to discuss the question, but not to reviel" +
+            " your guesses to other user."
+        }
+    },
+    _divider,
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "We are making intensive use of so call" +
+            " private messages within the thread. These are only delivered when being" +
+            " online and are lost on reloads. Use the button to resend them."
+        }
+    },
+    {
+        "type": "actions",
+        "elements": [_create_button('Resend interactive messages', 'REOPEN', 'REOPEN')]
+    }
+]
+
+
+# ------ admin
+
+def create_admin_section(guess):
+    if guess == 'INITIAL':
+        button = _create_button('Finish first guess', 'FINISH_INITAL_GUESS', 'FINISH_INITAL_GUESS')
+    elif guess == 'REVIESED':
+        button = _create_button('Finish second guess', 'FINISH_REVISED_GUESS', 'FINISH_REVISED_GUESS')
+    return [{
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"Only you as the creator can finish a guessing round."
+        },
+        'accessory': button
+    }]
+
+
+# ------------------ wait
+
+wait_first = [
+    _create_text_block(
+        "Wait for the creator to finish the first round.",
+        accessory=_create_button('Ok', 'CLOSE', 'CLOSE')
+    )]
+
+wait_second = [_create_text_block("Wait for the creator to finish the second round.")]

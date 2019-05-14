@@ -1,4 +1,4 @@
-
+from plots import pie_lots, bar_plots
 
 # ========== general ===========
 
@@ -192,7 +192,7 @@ def create_question(question, outcomes, steps):
 def _create_guess_header(message_name):
     if message_name == 'INITIAL_GUESS':
         text = "*Make a first guess for the likelihood of the following outcomes*"
-    elif message_name == 'REVISE_GUESS':
+    elif message_name == 'REVISED_GUESS':
         text = "*Revise your guess for likelihood of the following outcomes*"
     return {
         "type": "section",
@@ -300,7 +300,7 @@ def create_peer_select_message(n_peers, participants):
 def _create_outcome_header(step_id):
     if step_id == 'INITIAL_GUESS':
         text = "*Predictions from the initial guess.*"
-    elif step_id == 'REVISE_GUESS':
+    elif step_id == 'VIEW_FINAL':
         text = "*Predictions from the revised guess.*"
     return {
         "type": "section",
@@ -311,24 +311,37 @@ def _create_outcome_header(step_id):
     }
 
 
-def _create_debug_outcome_string(d):
-    return ','.join([f"{k}: {v}%" for k, v in d.items()])
-
-
-# intermediate solution
-def _create_outcome_info(guess_all, guess_peers=None, guess_you=None):
-    text = 'all: ' + _create_debug_outcome_string(guess_all)
-    if guess_peers:
-        text += '\npeers: ' + _create_debug_outcome_string(guess_peers)
-    if guess_you:
-        text += '\nyou: ' + _create_debug_outcome_string(guess_you)
+def create_fig(filename):
+    path = f'http://coltechtive.com/app/{filename}'
+    # path = "https://api.slack.com/img/blocks/bkb_template_images/beagle.png"
     return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": text
-        }
+        "type": "image",
+        "title": {
+            "type": "plain_text",
+            "text": "results",
+            "emoji": True
+        },
+        "image_url": path,
+        "alt_text": "results"
     }
+
+# def _create_debug_outcome_string(d):
+#     return ','.join([f"{k}: {v}%" for k, v in d.items()])
+
+
+def _create_outcome_info(guess_all, guess_peers=None, guess_you=None):
+    data = []
+    if guess_all:
+        data.append({'title': 'All', 'data': guess_all})
+    if guess_peers:
+        data.append({'title': 'Selected', 'data': guess_peers})
+    if guess_you:
+        data.append({'title': 'You', 'data': guess_you})
+    if len(data) == 1:
+        filename = pie_lots(data)
+    else:
+        filename = bar_plots(data)
+    return create_fig(filename)
 
 
 def create_outcome_message(step_id, guess_all, guess_peers=None, guess_you=None):

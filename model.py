@@ -1,7 +1,6 @@
 from time import sleep
 import dialogs as d
 from interface import SlackSession
-import requests
 from toolz import merge_with
 
 
@@ -43,10 +42,33 @@ def create_group_prediction(team, channel, creator, question, options):
 
     # debug
 
+    # guess_all = {
+    #     'Sleep': 4,
+    #     'Work': 8,
+    #     'Fun': 3
+    # }
+    # guess_peers = {
+    #     'Sleep': 3,
+    #     'Work': 3,
+    #     'Fun': 3
+    # }
+    # guess_you = {
+    #     'Sleep2': 2,
+    # #     'Work2': 8,
+    # #     'Fun2': 3
+    # }
+
+    # blocks = d.create_outcome_message('INITIAL_GUESS', guess_all, guess_peers, guess_you)
+    # sess.post_emessage_all('DEBUG', blocks)
+
+    # blocks = d.create_outcome_message('FINAL_GUESS', guess_all)
+    # sess.post_message('FINAL_GUESS', blocks, in_thread=False)
+
+
+
 
 def update_question(sess):
     store = sess.store
-    print(store)
     steps = store['steps']
     question = store['question']
     options = [o['outcome_name'] for o in store['outcomes']]
@@ -57,8 +79,10 @@ def update_question(sess):
 def close(sess, message_ts, response_url):
     sess.delete_emassage(message_ts, response_url)
 
+
 def reopen(sess):
     sess.reopen()
+
 
 def action_handler(team_id, channel_id, user_id, message_ts, block_id, action_id, action, response_url=None):
     print(block_id, action_id, action)
@@ -79,15 +103,16 @@ def action_handler(team_id, channel_id, user_id, message_ts, block_id, action_id
         elif action_id == 'FINISH_REVISED_GUESS':
             finish_revised_guess(sess, message_ts, response_url)
     elif message_name == 'REVISED_GUESS':
-        if block_name == 'SUBMIT':
-            revised_guess_submit_handler(sess)
-        else:
-            revised_guess_select_handler(sess, action_id, value)
-    elif message_name == 'PEER_SELECT':
-        if block_name == 'SUBMIT':
-            peer_select_submit_handler(sess, message_ts, response_url)
+        if action_id == 'SUBMIT':
+            revised_guess_submit_handler(sess, message_ts, response_url)
         else:
             value = int(action['selected_option']['value'])
+            revised_guess_select_handler(sess, action_id, value, message_ts, response_url)
+    elif message_name == 'SELECT_PEERS':
+        if action_id == 'SUBMIT':
+            peer_select_submit_handler(sess, message_ts, response_url)
+        else:
+            value = action['selected_option']['value']
             peer_select_select_handler(sess, action_id, value, message_ts, response_url)
     else:
         if action_id == 'CLOSE':
@@ -118,6 +143,7 @@ def initial_guess_select_handler(sess, action_id, value, message_ts, response_ur
     sess.set_store_value(['initial_guess', sess.user_id, action_id], value)
     user_guess = sess.get_store_value(['initial_guess', sess.user_id])
     outcomes = sess.get_store_value(['outcomes'])
+    print(outcomes)
     outcomes = [
         {
             **o,
@@ -158,6 +184,7 @@ def peer_select_select_handler(sess, action_id, value, message_ts, response_url)
     sess.set_store_value(['peers', sess.user_id, action_id], value)
     # TODO: Add some kind of reaction
 
+
 def peer_select_submit_handler(sess, message_ts, response_url):
     n_peers = sess.get_store_value(['n_peers'])
     selected_peers = sess.get_store_value(['peers', sess.user_id])
@@ -177,35 +204,66 @@ def peer_select_submit_handler(sess, message_ts, response_url):
         agg_peers = merge_with(lambda x: sum(x)/len(x), guesses_peers)
 
         blocks = d.create_outcome_message(
-            'INITIAL_GUESS', agg_all, guess_peers=agg_peers, guess_you=guesses_self)
+            'VIEW_INTERMEDIATE', agg_all, guess_peers=agg_peers, guess_you=guesses_self)
 
         sess.post_emessage('VIEW_INTERMEDIATE', blocks)
-
-        # outcomes = sess.get_store_value(['outcomes'])
-        # outcomes = [
-        #     {
-        #         **o,
-        #         'options': [add_selected(o['outcome_id'], user_guess, oo) for oo in o['options']]
-        #     }
-        #     for o in outcomes
-        # ]
-
-
-        # blocks = d.create_guess_message('REVISED_GUESS', outcomes)
-        # sess.post_emessage('REVISED_GUESS', blocks)
+        sleep(2)
+        blocks = _create_revised_guess_message(sess, 'initial_guess')
+        sess.post_emessage('REVISED_GUESS', blocks)
 
     else:
         # TODO: create some additional warning.
         pass
 
 
+def revised_guess_submit_handler(sess, message_ts, response_url):
+    user_guess = sess.get_store_value(['revised_guess', sess.user_id])
+    total = sum(user_guess.values())
+
+    if total == 100:
+        sess.set_store_value(['steps', 'REVISED_GUESS', 'user'], sess.user_id, append=True)
+        sess.delete_emassage(message_ts, response_url)
+        sess.post_emessage('WAIT_FIRST', d.wait_first)
+        update_question(sess)
+    else:
+        # TODO: create some additional warning.
+        pass
 
 
+def _create_revised_guess_message(sess, init_source):
+    user_guess = sess.get_store_value([init_source, sess.user_id])
+    outcomes = sess.get_store_value(['outcomes'])
+    print(outcomes, user_guess)
+    outcomes = [
+        {
+            **o,
+            'options': [add_selected(o['outcome_id'], user_guess, oo) for oo in o['options']]
+        }
+        for o in outcomes
+    ]
+    total_guess = sum(user_guess.values())
+    blocks = d.create_guess_message('REVISED_GUESS', outcomes, total_guess)
+    return blocks
 
 
-def finish_revised_guess(sess):
-    pass
+def revised_guess_select_handler(sess, action_id, value, message_ts, response_url):
+    sess.set_store_value(['revised_guess', sess.user_id, action_id], value)
+    blocks = _create_revised_guess_message(sess, 'revised_guess')
+    sess.update_emassage('REVISED_GUESS', message_ts, response_url, blocks)
 
-def update_guess_info(team, channel, gp_id, user, guess):
-    pass
 
+def finish_revised_guess(sess, message_ts, response_url):
+    sess.delete_emassage(message_ts, response_url)
+
+    sess.set_store_value(['steps', 'SELECT_PEERS', 'status'], 'FINISHED')
+    sess.set_store_value(['steps', 'VIEW_INTERMEDIATE', 'status'], 'FINISHED')
+    sess.set_store_value(['steps', 'REVIESE_GUESS', 'status'], 'FINISHED')
+
+    participants = sess.get_store_value(['steps', 'REVIESE_GUESS', 'user'])
+    sess.update_participants(participants)
+    update_question(sess)
+    guesses = sess.get_store_value(['initial_guess'])
+    guesses_all = list(guesses.values())
+    agg_all = merge_with(lambda x: sum(x)/len(x), guesses_all)
+    blocks = d.create_outcome_message('VIEW_FINAL', agg_all)
+    sess.post_message('VIEW_FINAL', blocks)

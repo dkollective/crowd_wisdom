@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 import json
 from threading import Thread
-from time import sleep
 
 from model import create_group_prediction, action_handler
-# from dialogs import create_question, create_guess_info_message
-# import team as s
-# from groupprediction import GroupPrediction
-# from test import test_create_and_delete, action_handler
 from interface import oauth, auth_team
-from flask import Flask, request, make_response, render_template, jsonify
+from flask import Flask, request, make_response, render_template, send_from_directory
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='')
 
 gds = {}
+
+
+@app.route('/static/<path:path>')
+def send_js(path):
+    return send_from_directory('static', path)
 
 
 @app.route("/install", methods=["GET"])
@@ -57,40 +57,26 @@ def health():
 
 @app.route("/action", methods=["POST", "GET"])
 def handle_action():
-    # todo: authorize
-
     payload = json.loads(request.form['payload'])
-
-    # resp = action_handler(payload)
-    # print(resp)
-    # return jsonify(resp)
 
     team_id = payload['team']['id']
     user_id = payload['user']['id']
     message_ts = payload['container']['message_ts']
     channel_id = payload['channel']['id']
     response_url = payload['response_url']
-    # trigger_id = payload['trigger_id']
 
     actions = payload['actions']
 
     for action in actions:
         action_id = action['action_id']
         block_id = action['block_id']
-        action_handler(team_id, channel_id, user_id, message_ts, block_id, action_id, action, response_url)
 
-    # if function_name == 'GD':
-    #     thread = Thread(
-    #         target=gds[function_id].action, args=(action_name, action_id, action))
-    #     thread.start()
+        thread = Thread(
+            target=action_handler, args=(
+                team_id, channel_id, user_id, message_ts, block_id,
+                action_id, action, response_url))
+        thread.start()
     return make_response('', 200)
-
-
-# def start_prediction(team, channel):
-#     sleep(0)
-#     global gds
-#     # gd = GroupPrediction(team=team, channel=channel)
-#     gds[gd.id] = gd
 
 
 @app.route("/decide", methods=["POST", "GET"])
@@ -98,43 +84,11 @@ def decide():
     team_id = request.form.get('team_id')
     channel_id = request.form.get('channel_id')
     user_id = request.form.get('user_id')
-    # team = Team(team_id)
-    # thread = Thread(target=start_prediction, args=(team, channel_id))
-    # thread.start()
     question = 'Which pill is he going to take?'
     options = ['Blue', 'Red']
-
-    # test_create_and_delete(team_id, channel_id, user_id)
-
-    create_group_prediction(team_id, channel_id, user_id, question, options)
-
-    # steps = {
-    #     'INITIAL_GUESS': {'status': 'ACTIVE', 'user': []},
-    #     'SELECT_PEARS': {'status': 'INACTIVE', 'user': []},
-    #     'VIEW_INTERMEDIATE': {'status': 'INACTIVE', 'user': []},
-    #     'REVIESE_GUESS': {'status': 'INACTIVE', 'user': []},
-    # }
-
-    # outcomes = [
-    #     {
-    #         'id': o,
-    #         'name': o,
-    #         'options': [{
-    #             'value': f"{i*5}", 'text': f"{i*5} %", 'inital_user': [], 'revised_user': []
-    #         } for i in range(21)]
-    #     }
-    #     for o in options
-    # ]
-
-    # blocks = create_question('Which pill is he going to take?', ['Blue', 'Red'], steps)
-
-    # data = {
-    #     # "response_type": "in_channel",
-    #     # "text": f"You started a group prediction.",
-    #     # "blocks": blocks
-    # }
-    # print(data)
-
+    thread = Thread(
+        target=create_group_prediction, args=(team_id, channel_id, user_id, question, options))
+    thread.start()
     return ('', 200)
 
 

@@ -137,7 +137,8 @@ class SlackSession:
             'message_ts': message_ts,
             'message_name': message_name,
             'blocks': blocks,
-            'mtype': mtype
+            'mtype': mtype,
+            'active': True
         }
         db["messages"].insert_one(ms_dict)
 
@@ -183,13 +184,16 @@ class SlackSession:
             'channel_id': self.channel_id,
             'user_id': self.user_id,
             'session_id': self.session_id,
-            'mtype': 'ephemeral'
+            'mtype': 'ephemeral',
+            'active': True
         }
         messages = db["messages"].find(ms_dict)
         for m in messages:
-            # TODO: bookkeeping of in_thread
+            print(m)
             message_ts = self.si.post_emessage(m['user_id'], m['blocks'], in_thread=True)
-            # TODO: bookkeeping of reopened messages
+            self.register_ms(
+                message_ts, m['message_name'], m['user_id'], m['blocks'], mtype='ephemeral')
+        db["messages"].update_many(ms_dict, {'$set': {'active': False}})
 
     # def delete_messages(self, message_name):
     #     ms_search = {
@@ -231,7 +235,7 @@ class SlackSession:
             'session_id': self.session_id,
             'message_ts': message_ts
         }
-        db["messages"].find_one_and_update(ms_search, {'$set': {'deleted': True}})
+        db["messages"].find_one_and_update(ms_search, {'$set': {'active': False}})
         self.si.delete_emassage(response_url)
 
     def get_channel_members(self):

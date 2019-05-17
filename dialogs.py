@@ -55,6 +55,14 @@ def _create_button(button_text, button_value, action_id=None):
     }
 
 
+_close_button = _create_button('Ok', 'CLOSE', 'CLOSE')
+
+_close_button_block = {
+    "type": 'actions',
+    "elements": [_close_button]
+}
+
+
 def _create_submit_fooder(step_id):
     return {
         "type": "actions",
@@ -71,16 +79,6 @@ def _create_text_block(text, accessory=None):
         },
         **({"accessory": accessory} if accessory else {})
     }
-
-
-# def _create_submit_fooder2(step_id):
-#     select = ['A', 'B']
-#     select = [{'value':s , 'text': s}for s in select]
-#     return {
-#         "type": "actions",
-#         "elements": [_create_button('Submit2', step_id + "_SUBMIT2"), _create_select('test',select)]
-#     }
-
 
 # ==== main message =============
 
@@ -99,10 +97,10 @@ def _create_step_status_section(step_id, status, user):
             'ACTIVE': f'*1. Give a first guess.* _({p_str})_',
             'FINISHED': f'_1. Give a first guess._ _({p_str})_',
         },
-        'SELECT_PEERS': {
-            'INACTIVE': '2. Select peers.',
-            'ACTIVE': '*2. Select peers.*',
-            'FINISHED': '_2. Select peers._',
+        'SELECT_USER': {
+            'INACTIVE': '2. Select selected.',
+            'ACTIVE': '*2. Select selected.*',
+            'FINISHED': '_2. Select selected._',
         },
         'VIEW_INTERMEDIATE': {
             'INACTIVE': '3. View intermediate results.',
@@ -124,7 +122,7 @@ def _create_step_status_section(step_id, status, user):
 
 
 def _create_status_block(steps):
-    order = ['INITIAL_GUESS', 'SELECT_PEERS', 'VIEW_INTERMEDIATE', 'REVIESE_GUESS']
+    order = ['INITIAL_GUESS', 'SELECT_USER', 'VIEW_INTERMEDIATE', 'REVIESE_GUESS']
     return [
         {
             "type": "section",
@@ -151,7 +149,7 @@ def _create_question_header(question, outcomes):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*{question}*"
+                "text": f"*TeamWisdom: {question}*"
             }
         },
         {
@@ -169,7 +167,7 @@ _question_fooder = {
     "elements": [
         {
             "type": "mrkdwn",
-            "text": "Report a bug: <mailto:bob@example.com|Email Bob Roberts>"
+            "text": "Report a bug: <mailto:datakollective@gmail.com|DataKollective>"
         }
     ]
 }
@@ -264,8 +262,8 @@ error_creator_only = [
 
 # ------------------ select peer members message
 
-def _create_select_peers_header(n_peers):
-    text = f"* Select {n_peers} members you trust most. *"
+def _create_select_selected_header(n_selected):
+    text = f"* Select {n_selected} members you trust most. *"
     return {
         "type": "section",
         "text": {
@@ -275,40 +273,26 @@ def _create_select_peers_header(n_peers):
     }
 
 
-def _create_select_peers_block(n_peers, participants):
-    text = 'Select peers.'
+def _create_select_selected_block(n_selected, participants):
+    text = 'Select selected.'
     options = [{'value': p, 'text': f'<@{p}>'} for p in participants]
     return {
         "type": "actions",
-        "elements": [_create_select(text, f'PEER_{i}', options) for i in range(n_peers)]
+        "elements": [_create_select(text, f'USER_{i}', options) for i in range(n_selected)]
     }
 
 
-def create_peer_select_message(n_peers, participants):
+def create_peer_select_message(n_selected, participants):
     return [
-        _create_text_block(f"*Select {n_peers} members you trust most.*"),
+        _create_text_block(f"*Select {n_selected} members you trust most.*"),
         _divider,
-        _create_select_peers_block(n_peers, participants),
+        _create_select_selected_block(n_selected, participants),
         _divider,
-        _create_submit_fooder("SELECT_PEERS")
+        _create_submit_fooder("SELECT_USER")
     ]
 
 
 # ------------------ outcome message
-
-
-def _create_outcome_header(step_id):
-    if step_id == 'INITIAL_GUESS':
-        text = "*Predictions from the initial guess.*"
-    elif step_id == 'VIEW_FINAL':
-        text = "*Predictions from the revised guess.*"
-    return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": text
-        }
-    }
 
 
 def create_fig(filename):
@@ -325,30 +309,34 @@ def create_fig(filename):
         "alt_text": "results"
     }
 
-# def _create_debug_outcome_string(d):
-#     return ','.join([f"{k}: {v}%" for k, v in d.items()])
 
-
-def _create_outcome_info(guess_all, guess_peers=None, guess_you=None):
-    data = []
-    if guess_all:
-        data.append({'title': 'All', 'data': guess_all})
-    if guess_peers:
-        data.append({'title': 'Selected', 'data': guess_peers})
-    if guess_you:
-        data.append({'title': 'You', 'data': guess_you})
-    if len(data) == 1:
-        filename = pie_lots(data)
-    else:
-        filename = bar_plots(data)
-    return create_fig(filename)
-
-
-def create_outcome_message(step_id, guess_all, guess_peers=None, guess_you=None):
+def create_int_view(guess_all, guess_selected, guess_user):
+    data = [
+        {'title': 'All', 'data': guess_all},
+        {'title': 'Selected', 'data': guess_selected},
+        {'title': 'You', 'data': guess_user}
+    ]
+    filename = bar_plots(data)
     return [
-        _create_outcome_header(step_id),
+        _create_text_block("*Predictions from the initial guess.*"),
         _divider,
-        _create_outcome_info(guess_all, guess_peers, guess_you)
+        create_fig(filename),
+        _divider,
+        _close_button_block
+    ]
+
+
+def create_final_view(question, guess_all):
+    data = [
+        {'title': question, 'data': guess_all},
+    ]
+    filename = pie_lots(data)
+    return [
+        _create_text_block("*Predictions from the revised guess.*"),
+        _divider,
+        create_fig(filename),
+        _divider,
+        _close_button_block
     ]
 
 
@@ -368,15 +356,15 @@ info_revise_now = [
 
 # ------------------ error same peer member selection
 
-def create_error_peers_selection(n_peers):
+def create_error_selected_selection(n_selected):
     return [
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"You have to select {n_peers} members."
+                "text": f"You have to select {n_selected} members."
             },
-            "accessory": _create_button('Ok', 'ERROR_PEERS_CLOSE')
+            "accessory": _create_button('Ok', 'ERROR_USER_CLOSE')
         }
     ]
 
@@ -431,7 +419,16 @@ def create_admin_section(guess):
 wait_first = [
     _create_text_block(
         "Wait for the creator to finish the first round.",
-        accessory=_create_button('Ok', 'CLOSE', 'CLOSE')
+        accessory=_close_button
     )]
 
 wait_second = [_create_text_block("Wait for the creator to finish the second round.")]
+
+
+# ------------------ error
+
+min_two_user = [
+    _create_text_block(
+        "In the first round a minimum of two participants is needed.",
+        accessory=_close_button
+)]

@@ -80,6 +80,40 @@ def _create_text_block(text, accessory=None):
         **({"accessory": accessory} if accessory else {})
     }
 
+
+def _create_context_block(text):
+    return {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": text
+            }
+        ]
+    }
+
+
+def _create_actions_block(*actions):
+    return {
+        "type": "actions",
+        "elements": actions
+    }
+
+
+def _create_fig(filename):
+    path = f'http://coltechtive.com/app/{filename}'
+    return {
+        "type": "image",
+        "title": {
+            "type": "plain_text",
+            "text": "results",
+            "emoji": True
+        },
+        "image_url": path,
+        "alt_text": "results"
+    }
+
+
 # ==== main message =============
 
 def _create_step_status_section(step_id, status, user):
@@ -131,37 +165,6 @@ def _create_status_block(steps):
     ]
 
 
-def _create_menu_section(steps):
-    return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": f"Follow the thread to join this group prediction."
-        }
-    }
-
-
-def _create_question_header(question, outcomes):
-    outcomes_str = _join_comma_andor([f'*{o}*'for o in outcomes], 'or')
-    return [
-        # _divider,
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*TeamWisdom: {question}*"
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"{outcomes_str}? Guess the likelihood of these outcomes."
-            }
-        },
-    ]
-
-
 _question_fooder = {
     "type": "context",
     "elements": [
@@ -174,104 +177,58 @@ _question_fooder = {
 
 
 def create_question(question, outcomes, steps):
+    question_str = f"*TeamWisdom: {question}*"
+
+    outcomes_str = _join_comma_andor([f'*{o}*'for o in outcomes], 'or')
+    outcomes_str = f"{outcomes_str}? Guess the likelihood of these outcomes."
+
+    info_str = "Follow the thread to join this group prediction."
+
+    fooder_str = "Report a bug: <mailto:datakollective@gmail.com|DataKollective>"
+
     return [
-        *_create_question_header(question, outcomes),
+        _create_text_block(question_str),
+        _create_text_block(outcomes_str),
         _divider,
         *_create_status_block(steps),
         _divider,
-        _create_menu_section(steps),
-        # _divider,
-        _question_fooder
+        _create_text_block(info_str),
+        _create_context_block(fooder_str)
     ]
+
 
 # ------------------ guess message
 
-
-def _create_guess_header(message_name):
-    if message_name == 'INITIAL_GUESS':
-        text = "*Make a first guess for the likelihood of the following outcomes*"
-    elif message_name == 'REVISED_GUESS':
-        text = "*Revise your guess for likelihood of the following outcomes*"
-    return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": text
-        }
-    }
-
-
-def _create_guess_section(outcome_id, outcome_name, options):
-    return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": outcome_name
-        },
-        "accessory": _create_select("Select outcome probability", outcome_id, options)
-    }
-
-
-def _create_guess_block(outcomes):
-    return [_create_guess_section(**o) for o in outcomes]
-
-
 def create_guess_message(message_name, outcomes, total_sum=0):
+    if message_name == 'INITIAL_GUESS':
+        header_text = "*Make a first guess for the likelihood of the following outcomes*"
+    elif message_name == 'REVISED_GUESS':
+        header_text = "*Revise your guess for likelihood of the following outcomes*"
+
+    if total_sum != 100:
+        info_text = f'Procentages need to sum up to 100%. Current total: {total_sum}%'
+    else:
+        info_text = 'Great. Procentages are adding up to 100%.'
+
+    outcome_block = [
+        _create_text_block(
+            o['outcome_name'],
+            accessory=_create_select("Select outcome probability", o['outcome_id'], o['options']))
+        for o in outcomes
+    ]
+
     return [
-        _create_guess_header(message_name),
+        _create_text_block(header_text),
         _divider,
-        *_create_guess_block(outcomes),
+        *outcome_block,
         _divider,
-        *create_guess_info_message(total_sum),
+        _create_text_block(info_text),
         _divider,
         _create_submit_fooder(message_name)
     ]
 
 
-# ------------------ guess info message
-
-def create_guess_info_message(sum_guess):
-    if sum_guess != 100:
-        text = f'Procentages need to sum up to 100%. Current total: {sum_guess}%'
-    else:
-        text = 'Great. Procentages are adding up to 100%.'
-    return [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": text
-            },
-        }
-    ]
-
-
-# ------------------ info creator button
-
-error_creator_only = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "Only the creator can finish a round."
-        },
-        "accessory": _create_button('Ok', 'ERROR_CREATOR_ONLY_CLOSE')
-    }
-]
-
-
 # ------------------ select peer members message
-
-def _create_select_selected_header(n_selected):
-    text = f"* Select {n_selected} members you trust most. *"
-    return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": text
-        }
-    }
-
 
 def _create_select_selected_block(n_selected, participants):
     text = 'Select selected.'
@@ -294,22 +251,6 @@ def create_peer_select_message(n_selected, participants):
 
 # ------------------ outcome message
 
-
-def create_fig(filename):
-    path = f'http://coltechtive.com/app/{filename}'
-    # path = "https://api.slack.com/img/blocks/bkb_template_images/beagle.png"
-    return {
-        "type": "image",
-        "title": {
-            "type": "plain_text",
-            "text": "results",
-            "emoji": True
-        },
-        "image_url": path,
-        "alt_text": "results"
-    }
-
-
 def create_int_view(guess_all, guess_selected, guess_user):
     data = [
         {'title': 'All', 'data': guess_all},
@@ -320,7 +261,7 @@ def create_int_view(guess_all, guess_selected, guess_user):
     return [
         _create_text_block("*Predictions from the initial guess.*"),
         _divider,
-        create_fig(filename),
+        _create_fig(filename),
         _divider,
         _close_button_block
     ]
@@ -334,66 +275,24 @@ def create_final_view(question, guess_all):
     return [
         _create_text_block("*Predictions from the revised guess.*"),
         _divider,
-        create_fig(filename),
+        _create_fig(filename),
         _divider,
         _close_button_block
-    ]
-
-
-# ------------------ info revise
-
-info_revise_now = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "You can now revise your guess."
-        },
-        "accessory": _create_button('Ok', 'REVISE_NOW_CLOSE')
-    }
-]
-
-
-# ------------------ error same peer member selection
-
-def create_error_selected_selection(n_selected):
-    return [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"You have to select {n_selected} members."
-            },
-            "accessory": _create_button('Ok', 'ERROR_USER_CLOSE')
-        }
     ]
 
 
 # ------------------ open thread
 
 open_thread = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "We encourage you to discuss the question, but not to reviel" +
-            " your guesses to other user."
-        }
-    },
+    _create_text_block(
+        "We encourage you to discuss the question, but not to reviel" +
+        " your guesses to other user."),
     _divider,
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "We are making intensive use of so call" +
-            " private messages within the thread. These are only delivered when being" +
-            " online and are lost on reloads. Use the button to resend them."
-        }
-    },
-    {
-        "type": "actions",
-        "elements": [_create_button('Resend interactive messages', 'REOPEN', 'REOPEN')]
-    }
+    _create_text_block(
+        "We are making intensive use of so call" +
+        " private messages within the thread. These are only delivered when being" +
+        " online and are lost on reloads. Use the button to resend them."),
+    _create_actions_block(_create_button('Resend interactive messages', 'REOPEN', 'REOPEN'))
 ]
 
 
@@ -401,17 +300,13 @@ open_thread = [
 
 def create_admin_section(guess):
     if guess == 'INITIAL':
-        button = _create_button('Finish first guess', 'FINISH_INITAL_GUESS', 'FINISH_INITAL_GUESS')
+        button = _create_button(
+            'Finish first guess', 'FINISH_INITAL_GUESS', 'FINISH_INITAL_GUESS')
     elif guess == 'REVIESED':
-        button = _create_button('Finish second guess', 'FINISH_REVISED_GUESS', 'FINISH_REVISED_GUESS')
-    return [{
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": f"Only you as the creator can finish a guessing round."
-        },
-        'accessory': button
-    }]
+        button = _create_button(
+            'Finish second guess', 'FINISH_REVISED_GUESS', 'FINISH_REVISED_GUESS')
+    return [_create_text_block(
+        "Only you as the creator can finish a guessing round.", accessory=button)]
 
 
 # ------------------ wait
@@ -419,8 +314,8 @@ def create_admin_section(guess):
 wait_first = [
     _create_text_block(
         "Wait for the creator to finish the first round.",
-        accessory=_close_button
-    )]
+        accessory=_close_button)
+    ]
 
 wait_second = [_create_text_block("Wait for the creator to finish the second round.")]
 
@@ -430,5 +325,5 @@ wait_second = [_create_text_block("Wait for the creator to finish the second rou
 min_two_user = [
     _create_text_block(
         "In the first round a minimum of two participants is needed.",
-        accessory=_close_button
-)]
+        accessory=_close_button)
+    ]

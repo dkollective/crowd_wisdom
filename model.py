@@ -32,6 +32,7 @@ def create_group_prediction(team, channel, creator, question, options):
         'selected': {}, 'question': question, 'outcome_id_map': outcome_id_map}
 
     sleep(2)
+    print(d.open_thread)
     sess.post_message('OPEN_THREAD', d.open_thread)
 
     sleep(1)
@@ -43,7 +44,6 @@ def create_group_prediction(team, channel, creator, question, options):
     sess.post_emessage_all('INITIAL_GUESS', blocks)
 
     # debug
-
 
 
 def update_question(sess):
@@ -63,8 +63,8 @@ def reopen(sess):
     sess.reopen()
 
 
-def action_handler(team_id, channel_id, user_id, message_ts, block_id, action_id, action, response_url=None):
-    print(block_id, action_id, action)
+def action_handler(
+        team_id, channel_id, user_id, message_ts, block_id, action_id, action, response_url=None):
     sess = SlackSession.get(team_id, channel_id, user_id, message_ts)
     message_name, block_name = block_id.split('#')
     if message_name == 'OPEN_THREAD':

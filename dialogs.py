@@ -1,9 +1,11 @@
 from plots import pie_lots, bar_plots
+from settings import settings_info
+
 
 # ========== general ===========
 
-
-def _create_select(placeholder, action_id, options):
+def _create_select(placeholder, action_id, options, value=None):
+    print('value', value)
     option_objs = []
     initial_option = {}
     for o in options:
@@ -16,8 +18,7 @@ def _create_select(placeholder, action_id, options):
             "value": o['value'],
         }
         option_objs.append(option)
-        if o.get('selected'):
-            assert not initial_option, 'Only one option can be selected.'
+        if value == o['value']:
             initial_option = {"initial_option": option}
 
     return {
@@ -57,17 +58,11 @@ def _create_button(button_text, button_value, action_id=None):
 
 _close_button = _create_button('Ok', 'CLOSE', 'CLOSE')
 
+
 _close_button_block = {
     "type": 'actions',
     "elements": [_close_button]
 }
-
-
-def _create_submit_fooder(step_id):
-    return {
-        "type": "actions",
-        "elements": [_create_button('Submit', step_id + "_SUBMIT", 'SUBMIT')]
-    }
 
 
 def _create_text_block(text, accessory=None):
@@ -114,9 +109,23 @@ def _create_fig(filename):
     }
 
 
+def _create_fields_block(texts):
+    fields = [
+        {
+            "type": "mrkdwn",
+            "text": text
+        }
+        for text in texts
+    ]
+    return {
+        "type": "section",
+        "fields": fields
+    }
+
+
 # ==== main message =============
 
-def _create_step_status_section(step_id, status, user):
+def _create_round_section(status, name, user, **kwargs):
     if len(user) == 0:
         p_str = 'Noone responded yet'
     elif len(user) == 1:
@@ -126,95 +135,61 @@ def _create_step_status_section(step_id, status, user):
     else:
         p_str = f'<@{user[0]}>, <@{user[1]}> and {len(user) - 2} others'
 
-    text_templates = {
-        'INITIAL_GUESS': {
-            'ACTIVE': f'*1. Give a first guess.* _({p_str})_',
-            'FINISHED': f'_1. Give a first guess._ _({p_str})_',
-        },
-        'SELECT_USER': {
-            'INACTIVE': '2. Select selected.',
-            'ACTIVE': '*2. Select selected.*',
-            'FINISHED': '_2. Select selected._',
-        },
-        'VIEW_INTERMEDIATE': {
-            'INACTIVE': '3. View intermediate results.',
-            'ACTIVE': '*3. View intermediate results.*',
-            'FINISHED': '_3. View intermediate results._',
-        },
-        'REVIESE_GUESS': {
-            'INACTIVE': '4. Give a second guess.',
-            'ACTIVE': f'*4. Give a second guess.* _({p_str})_',
-            'FINISHED': f'_4. Give a second guess._ _({p_str})_',
-        },
-    }
-    text = text_templates[step_id][status]
-
-    return {
-            "type": "mrkdwn",
-            "text": text
-    }
+    if status == 'ACTIVE':
+        text = f'*{name}* ({p_str})'
+    elif status == 'INACTIVE':
+        text = f'{name}'
+    elif status == 'FINISHED':
+        text = f'{name} ({p_str})'
+    return text
 
 
-def _create_status_block(steps):
-    order = ['INITIAL_GUESS', 'SELECT_USER', 'VIEW_INTERMEDIATE', 'REVIESE_GUESS']
-    return [
-        {
-            "type": "section",
-            "fields": [_create_step_status_section(so, **steps[so]) for so in order]
-        }
-    ]
-
-
-_question_fooder = {
-    "type": "context",
-    "elements": [
-        {
-            "type": "mrkdwn",
-            "text": "Report a bug: <mailto:datakollective@gmail.com|DataKollective>"
-        }
-    ]
-}
-
-
-def create_question(question, outcomes, steps):
+def create_question(question, entities, rounds, final_results=None):
     question_str = f"*TeamWisdom: {question}*"
 
-    outcomes_str = _join_comma_andor([f'*{o}*'for o in outcomes], 'or')
-    outcomes_str = f"{outcomes_str}? Guess the likelihood of these outcomes."
+    entities_str = _join_comma_andor([f"*{o['entity_name']}*" for o in entities], 'or')
 
     info_str = "Follow the thread to join this group prediction."
-
     fooder_str = "Report a bug: <mailto:datakollective@gmail.com|DataKollective>"
+    rounds_strs = [_create_round_section(**r) for r in rounds]
+
+    if final_results is not None:
+        filename = bar_plots(final_results, question)
+        info_block = _create_fig(filename)
+    else:
+        info_block = _create_text_block(info_str)
 
     return [
         _create_text_block(question_str),
-        _create_text_block(outcomes_str),
+        _create_text_block(entities_str),
         _divider,
-        *_create_status_block(steps),
+        _create_fields_block(rounds_strs),
         _divider,
-        _create_text_block(info_str),
+        info_block,
         _create_context_block(fooder_str)
     ]
 
 
 # ------------------ guess message
 
-def create_guess_message(message_name, outcomes, total_sum=0):
-    if message_name == 'INITIAL_GUESS':
-        header_text = "*Make a first guess for the likelihood of the following outcomes*"
-    elif message_name == 'REVISED_GUESS':
-        header_text = "*Revise your guess for likelihood of the following outcomes*"
+def create_estimate_message(question, entities, estimate_sum, constrained_sum, unit, round_idx):
+    header_text = f'*Round {round_idx}: {question}* Make estimates'
 
-    if total_sum != 100:
-        info_text = f'Procentages need to sum up to 100%. Current total: {total_sum}%'
+    if constrained_sum is None:
+        info_text = f'Sum: {estimate_sum} {unit}'
     else:
-        info_text = 'Great. Procentages are adding up to 100%.'
+        if estimate_sum == constrained_sum:
+            info_text = f'Great. Values are adding up to {constrained_sum} {unit}'
+        else:
+            info_text = f'Values need to sum up to {constrained_sum} {unit}.' + \
+                f' Current sum: {estimate_sum} {unit}'
 
     outcome_block = [
         _create_text_block(
-            o['outcome_name'],
-            accessory=_create_select("Select outcome probability", o['outcome_id'], o['options']))
-        for o in outcomes
+            e['entity_name'],
+            accessory=_create_select(
+                "Select outcome probability", e['entity_id'], e['options'], e.get('value')))
+        for e in entities
     ]
 
     return [
@@ -224,7 +199,7 @@ def create_guess_message(message_name, outcomes, total_sum=0):
         _divider,
         _create_text_block(info_text),
         _divider,
-        _create_submit_fooder(message_name)
+        _create_actions_block(_create_button('Submit', "SUBMIT", 'SUBMIT'))
     ]
 
 
@@ -245,21 +220,16 @@ def create_peer_select_message(n_selected, participants):
         _divider,
         _create_select_selected_block(n_selected, participants),
         _divider,
-        _create_submit_fooder("SELECT_USER")
+        _create_actions_block(_create_button('Submit', "SUBMIT", 'SUBMIT'))
     ]
 
 
 # ------------------ outcome message
 
-def create_int_view(guess_all, guess_selected, guess_user):
-    data = [
-        {'title': 'All', 'data': guess_all},
-        {'title': 'Selected', 'data': guess_selected},
-        {'title': 'You', 'data': guess_user}
-    ]
+def create_view(round_idx, data):
     filename = bar_plots(data)
     return [
-        _create_text_block("*Predictions from the initial guess.*"),
+        _create_text_block(f"*Estimate of round {round_idx}.*"),
         _divider,
         _create_fig(filename),
         _divider,
@@ -298,15 +268,11 @@ open_thread = [
 
 # ------ admin
 
-def create_admin_section(guess):
-    if guess == 'INITIAL':
-        button = _create_button(
-            'Finish first guess', 'FINISH_INITAL_GUESS', 'FINISH_INITAL_GUESS')
-    elif guess == 'REVIESED':
-        button = _create_button(
-            'Finish second guess', 'FINISH_REVISED_GUESS', 'FINISH_REVISED_GUESS')
+def create_admin_section(round_idx):
     return [_create_text_block(
-        "Only you as the creator can finish a guessing round.", accessory=button)]
+        "Finish the round.",
+        accessory=_create_button(f'Finish round {round_idx}', 'FINISH', 'FINISH')
+    )]
 
 
 # ------------------ wait
@@ -326,4 +292,25 @@ min_two_user = [
     _create_text_block(
         "In the first round a minimum of two participants is needed.",
         accessory=_close_button)
+    ]
+
+
+# ------------------------ settings
+
+def create_settings_message(question, entities, settings):
+    question_str = f"*Question:* {question}"
+    entities_str = "*Options:* " + _join_comma_andor([f'*{o}*'for o in entities], 'or')
+
+    settings_strs = [f"{s['display']}: {settings[s['id']]}" for s in settings_info]
+    return [
+        _create_text_block('*TeamWisdom*'),
+        _divider,
+        _create_text_block(question_str),
+        _create_text_block(entities_str),
+        _divider,
+        _create_fields_block(settings_strs),
+        _create_actions_block(
+            _create_button('Edit Settings', 'UPDATE', 'UPDATE'),
+            _create_button('Start', 'START', 'START'),
+        )
     ]

@@ -2,7 +2,7 @@
 import json
 from threading import Thread
 
-from model import create_group_prediction, action_handler
+from model import create_group_prediction, action_handler, submission_handler
 from interface import oauth, auth_team
 from flask import Flask, request, make_response, render_template, send_from_directory
 
@@ -55,16 +55,14 @@ def health():
     return render_template("health.html")
 
 
-@app.route("/action", methods=["POST", "GET"])
-def handle_action():
-    payload = json.loads(request.form['payload'])
-
+def handle_block_action(payload):
     team_id = payload['team']['id']
     user_id = payload['user']['id']
-    message_ts = payload['container']['message_ts']
     channel_id = payload['channel']['id']
     response_url = payload['response_url']
 
+    message_ts = payload['container']['message_ts']
+    trigger_id = payload['trigger_id']
     actions = payload['actions']
 
     for action in actions:
@@ -74,8 +72,34 @@ def handle_action():
         thread = Thread(
             target=action_handler, args=(
                 team_id, channel_id, user_id, message_ts, block_id,
-                action_id, action, response_url))
+                action_id, action, response_url, trigger_id))
         thread.start()
+
+
+def handle_dialog_submission(payload):
+    team_id = payload['team']['id']
+    channel_id = payload['channel']['id']
+    user_id = payload['user']['id']
+    response_url = payload['response_url']
+
+    callback_id = payload['callback_id']
+    submission = payload['submission']
+
+    thread = Thread(
+        target=submission_handler,
+        args=(team_id, channel_id, user_id, callback_id, submission, response_url))
+    thread.start()
+
+
+@app.route("/action", methods=["POST", "GET"])
+def handle_action():
+    payload = json.loads(request.form['payload'])
+    action_type = payload['type']
+    if action_type == 'block_actions':
+        handle_block_action(payload)
+    elif action_type == 'dialog_submission':
+        handle_dialog_submission(payload)
+
     return make_response('', 200)
 
 
@@ -84,8 +108,12 @@ def decide():
     team_id = request.form.get('team_id')
     channel_id = request.form.get('channel_id')
     user_id = request.form.get('user_id')
-    question = 'Which pill is he going to take?'
-    options = ['Blue', 'Red']
+    text = request.form.get('text')
+    text_str = text[1:-1].split('" "')
+
+    print(text_str)
+    question = text_str[0]
+    options = text_str[1:]
     thread = Thread(
         target=create_group_prediction, args=(team_id, channel_id, user_id, question, options))
     thread.start()

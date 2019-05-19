@@ -27,8 +27,8 @@ def pie_lots(data):
     return filename
 
 
-def bar_plots(data):
-    colors = [[34, 108, 120],[78, 205, 196],[255, 107, 107]]
+def bar_plots(data, title):
+    colors = [[34, 108, 120], [78, 205, 196], [255, 107, 107]]
     colors_01 = [tuple(cc/255 for cc in c) for c in colors]
     options = set(chain.from_iterable(d['data'].keys() for d in data))
 
@@ -37,23 +37,30 @@ def bar_plots(data):
     fig, ax = plt.subplots(figsize=(7, 7/4 * N), dpi=200)
 
     ind = np.arange(N)    # the x locations for the groups
-    width = 0.30
+    width = 0.9 / len(data)
+    _min = -0.45 + width * 0.5
+    _max = 0.45 - width * 0.5
 
-    shift = [width, 0, -width]
+    shift = np.linspace(_min, _max, len(data))
 
     p = []
     for d, c, s in zip(data, colors_01, shift):
         values = [d['data'].get(o, 0) for o in options]
         pos = ind + s
-        print(pos, values)
+        print(pos, values, width, c)
         p.append(ax.barh(pos, values, width, color=c))
         for i, v in zip(pos, values):
             ax.text(
-                1, i-0.08, '{:3.0f} %'.format(v), fontsize=16, color=('w' if v > 8 else 'black'), weight='bold')
+                1, i-0.08, '{:3.0f} %'.format(v), fontsize=16, color=('w' if v > 8 else 'black'),
+                weight='bold')
     ax.set_yticks(ind)
     ax.set_yticklabels(options, rotation=90, fontsize=16, ha='right', va='center')
 
-    ax.legend(p, [d['title'] for d in data], frameon=False, fontsize='large')
+    if title:
+        ax.set_title(title, fontsize=20)
+
+    if len(data) > 1:
+        ax.legend(p, [d['title'] for d in data], frameon=False, fontsize='large')
     ax.get_xaxis().set_visible(False)
     ax.tick_params(axis='y', which='both',length=0)
     plt.box(False)

@@ -1,0 +1,16 @@
+version: '2'
+services:
+  crowdwisdom:
+    ports:
+      - "4005:4005"
+    image: levinb/foodkmbackend:0.0.1
+    networks:
+      - elk
+    environment:
+      - N_WORKERS=2
+      - PORT=3423
+      - FOODKM_ES_HOST=elasticsearch
+      - FOODKM_ES_PORT=9200
+networks:
+  elk:
+    driver: bridge

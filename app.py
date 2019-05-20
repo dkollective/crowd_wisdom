@@ -103,15 +103,14 @@ def handle_action():
     return make_response('', 200)
 
 
-@app.route("/decide", methods=["POST", "GET"])
-def decide():
+@app.route("/predict", methods=["POST", "GET"])
+def predict():
     team_id = request.form.get('team_id')
     channel_id = request.form.get('channel_id')
     user_id = request.form.get('user_id')
     text = request.form.get('text')
     text_str = text[1:-1].split('" "')
 
-    print(text_str)
     question = text_str[0]
     options = text_str[1:]
     thread = Thread(

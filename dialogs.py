@@ -145,7 +145,7 @@ def _create_round_section(status, name, user, **kwargs):
 
 
 def create_question(question, entities, rounds, final_results=None):
-    question_str = f"*TeamWisdom: {question}*"
+    question_str = f"*{question}*"
 
     entities_str = _join_comma_andor([f"*{o['entity_name']}*" for o in entities], 'or')
 
@@ -303,7 +303,7 @@ def create_settings_message(question, entities, settings):
 
     settings_strs = [f"{s['display']}: {settings[s['id']]}" for s in settings_info]
     return [
-        _create_text_block('*TeamWisdom*'),
+        # _create_text_block('*TeamWisdom*'),
         _divider,
         _create_text_block(question_str),
         _create_text_block(entities_str),

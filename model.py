@@ -198,6 +198,7 @@ def show_estimates(sess, round_idx):
     store = sess.store
     estimates = store['rounds'][round_idx - 1]['estimates']
     participants = store['rounds'][round_idx - 1]['user']
+    unit = store['settings']['unit']
 
     agg_estimates = merge_with(lambda x: sum(x)/len(x), estimates.values())
 
@@ -208,8 +209,8 @@ def show_estimates(sess, round_idx):
     for p in participants:
         p_estimates = {name_map[k]: v for k, v in estimates[p].items()}
         data = [
-            {'title': 'All', 'data': agg_estimates},
-            {'title': 'You', 'data': p_estimates}
+            {'title': 'All', 'data': agg_estimates, 'unit': unit},
+            {'title': 'You', 'data': p_estimates, 'unit': unit}
         ]
         blocks = d.create_view(round_idx, data)
         sess.post_emessage(f'{round_idx}#VIEW', blocks, user_id=p)
@@ -246,7 +247,8 @@ def finish_round(sess, round_idx, message_ts, response_url):
             name_map = {e['entity_id']: e['entity_name'] for e in store['entities']}
             agg_estimates = merge_with(lambda x: sum(x)/len(x), prev_estimates.values())
             agg_estimates = {name_map[k]: v for k, v in agg_estimates.items()}
-            final_results = [{'data': agg_estimates}]
+            unit = store['settings']['unit']
+            final_results = [{'data': agg_estimates, 'unit': unit}]
         update_question(sess, final_results)
 
 

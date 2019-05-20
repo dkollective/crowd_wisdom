@@ -324,6 +324,7 @@ class SlackInteract:
             "channels.info",
             channel=self.channel_id
         )
+        print(channel_info)
         return channel_info['channel']['members']
 
     def open_dialog(self, trigger_id, dialog):

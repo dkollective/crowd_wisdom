@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<!-- Based on: https://bl.ocks.org/mbostock/1893974 -->
+<!--     License: https://opensource.org/licenses/GPL-3.0 -->
+<meta charset="utf-8">
+<body>
+    <div id="logo">
+    </div>
+    <canvas id="canvasId"></canvas>
+</body>
+<script src="https://d3js.org/d3.v3.min.js"></script>
+
+<script>
+
+var maxRadius = 30, // maximum radius of circle
+    padding = 15, // padding between circles; also minimum radius
+    margin = {top: -maxRadius, right: -maxRadius, bottom: -maxRadius, left: -maxRadius},
+    width = 900 - margin.left - margin.right,
+    height = 900 - margin.top - margin.bottom;
+
+var lposx = 200, lposy = 250;
+
+var k = 1, // initial number of candidates to consider per circle
+    m = 10, // initial number of circles to add per frame
+    n = 2500; // remaining number of circles to add;
+
+var svg = d3.select("#logo").append("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+
+
+function closestPoint(pathNode, point) {
+  var pathLength = pathNode.getTotalLength(),
+      precision = 8,
+      best,
+      bestLength,
+      bestDistance = Infinity;
+
+  // linear scan for coarse approximation
+  for (var scan, scanLength = 0, scanDistance; scanLength <= pathLength; scanLength += precision) {
+    if ((scanDistance = distance2(scan = pathNode.getPointAtLength(scanLength))) < bestDistance) {
+      best = scan, bestLength = scanLength, bestDistance = scanDistance;
+    }
+  }
+
+  // binary search for precise estimate
+  precision /= 2;
+  while (precision > 0.5) {
+    var before,
+        after,
+        beforeLength,
+        afterLength,
+        beforeDistance,
+        afterDistance;
+    if ((beforeLength = bestLength - precision) >= 0 && (beforeDistance = distance2(before = pathNode.getPointAtLength(beforeLength))) < bestDistance) {
+      best = before, bestLength = beforeLength, bestDistance = beforeDistance;
+    } else if ((afterLength = bestLength + precision) <= pathLength && (afterDistance = distance2(after = pathNode.getPointAtLength(afterLength))) < bestDistance) {
+      best = after, bestLength = afterLength, bestDistance = afterDistance;
+    } else {
+      precision /= 2;
+    }
+  }
+
+  best = [best.x, best.y];
+  best.distance = Math.sqrt(bestDistance);
+  return best;
+
+  function distance2(p) {
+    var dx = p.x - point[0],
+        dy = p.y - point[1];
+    return dx * dx + dy * dy;
+  }
+}
+
+
+dk = "M 110.84 350.099 L 0 350.099 L 0 0.002 L 110.84 0.002 Q 128.662 0.002 144.409 6.715 A 86.266 86.266 0 0 1 171.875 25.148 A 86.266 86.266 0 0 1 190.308 52.614 Q 197.021 68.361 197.021 86.183 L 197.021 264.162 Q 197.021 281.984 190.308 297.609 A 86.637 86.637 0 0 1 171.875 324.953 A 86.266 86.266 0 0 1 144.409 343.385 Q 128.662 350.099 110.84 350.099 Z M 481.934 350.099 L 442.871 350.099 L 311.035 175.05 L 442.871 0.002 L 481.934 0.002 L 347.412 175.05 L 481.934 350.099 Z M 165.527 264.162 L 165.527 86.183 A 55.012 55.012 0 0 0 162.399 67.538 A 52.086 52.086 0 0 0 161.133 64.333 A 57.084 57.084 0 0 0 149.048 46.51 A 57.084 57.084 0 0 0 131.226 34.425 A 54.038 54.038 0 0 0 110.47 30.041 A 61.915 61.915 0 0 0 109.375 30.031 L 31.494 30.031 L 31.494 320.07 L 109.375 320.07 A 55.012 55.012 0 0 0 128.021 316.941 A 52.086 52.086 0 0 0 131.226 315.675 Q 141.357 311.281 149.048 303.713 A 55.63 55.63 0 0 0 161.133 286.012 A 54.038 54.038 0 0 0 165.518 265.257 A 61.915 61.915 0 0 0 165.527 264.162 Z M 303.467 350.099 L 271.973 350.099 L 271.973 0.002 L 303.467 0.002 L 303.467 350.099 Z"
+tw = 'M 402 349 L 387 349 L 294 0 L 306 0 L 394 333.5 L 395.5 333.5 L 489 0 L 505 0 L 598.5 333.5 L 600 333.5 L 688.5 0 L 700 0 L 607 349 L 592 349 L 497.5 12 L 496 12 L 402 349 Z M 263 10 L 137 10 L 137 349 L 126 349 L 126 10 L 0 10 L 0 0 L 263 0 L 263 10 Z'
+var flask = svg.append("svg:path")
+.attr("d", tw)
+.style("fill", "None");
+
+
+var newCircle = bestCircleGenerator(maxRadius, padding);
+
+d3.timer(function() {
+  for (var i = 0; i < m && --n >= 0; ++i) {
+    var circle = newCircle(k);
+
+    const point = closestPoint(flask.node(), [circle[0] - lposx, circle[1] - lposy]);
+
+    var color = ((point.distance < 30) ? "#FF530D" : "#09AF68");
+
+    var opacity = ((point.distance < 30) ? (Math.random() + 2) / 3 : (Math.random() + 0.5) / 2);
+
+    svg.append("circle")
+        .attr("cx", circle[0])
+        .attr("cy", circle[1])
+        .attr("r", 0)
+        .style("fill", color)
+        .style("fill-opacity", opacity)
+        .transition()
+        .attr("r", circle[2]);
+
+    // As we add more circles, generate more candidates per circle.
+    // Since this takes more effort, gradually reduce circles per frame.
+    if (k < 500) k *= 1.01, m *= .998;
+  }
+  return !n;
+});
+
+function bestCircleGenerator(maxRadius, padding) {
+  var quadtree = d3.geom.quadtree().extent([[0, 0], [width, height]])([]),
+      searchRadius = maxRadius * 2,
+      maxRadius2 = maxRadius * maxRadius;
+
+  return function(k) {
+    var bestX, bestY, bestDistance = 0;
+
+    for (var i = 0; i < k || bestDistance < padding; ++i) {
+      var x = Math.random() * width,
+          y = Math.random() * height,
+          rx1 = x - searchRadius,
+          rx2 = x + searchRadius,
+          ry1 = y - searchRadius,
+          ry2 = y + searchRadius,
+          minDistance = maxRadius; // minimum distance for this candidate
+
+      quadtree.visit(function(quad, x1, y1, x2, y2) {
+        if (p = quad.point) {
+          var p,
+              dx = x - p[0],
+              dy = y - p[1],
+              d2 = dx * dx + dy * dy,
+              r2 = p[2] * p[2];
+          if (d2 < r2) return minDistance = 0, true; // within a circle
+          var d = Math.sqrt(d2) - p[2];
+          if (d < minDistance) minDistance = d;
+        }
+        return !minDistance || x1 > rx2 || x2 < rx1 || y1 > ry2 || y2 < ry1; // or outside search radius
+      });
+
+      if (minDistance > 30) {
+        point = closestPoint(flask.node(), [x - lposx, y - lposy]);
+        tDist = point.distance;
+        minDistance = (tDist > 50 ? minDistance : Math.min(minDistance, 30));
+      }
+      if (minDistance > bestDistance) bestX = x, bestY = y, bestDistance = minDistance;
+    }
+
+    var best = [bestX, bestY, bestDistance - 8];
+    quadtree.add(best);
+    return best;
+  };
+}
+
+let filename = 'logo'
+let canvas = document.getElementById('canvasId')
+
+function drawCanvas() {
+  let svgHtml = document.getElementById('logo').innerHTML.trim()
+  canvg(canvas,svgHtml)
+}
+
+function downloadPNG() {
+  let url = canvas.toDataURL('image/png')
+  let link = document.createElement('a')
+
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+}
+
+function downloadPDF() {
+  // use html2canvas
+  html2canvas(canvas, {
+      onrendered: function(canvas) {
+          var imgData = canvas.toDataURL('image/png')
+          var doc = new jsPDF()
+          doc.addImage(imgData, 'PNG', 10, 10)
+          doc.save('logo.pdf')
+      }
+  })
+}
+
+</script>

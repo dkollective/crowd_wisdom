@@ -1,8 +1,9 @@
 from time import sleep
-import dialogs as d
-from interface import SlackSession
-from settings import create_settings_dialog, settings_info
 from toolz import merge_with
+
+from . import dialogs as d
+from . interface import SlackSession
+from . settings import create_settings_dialog, settings_info
 
 # actions
 

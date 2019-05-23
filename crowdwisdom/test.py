@@ -1,7 +1,8 @@
 from time import sleep
-from interface import get_bot_token
 from slackclient import SlackClient
 import requests
+
+from . interface import get_bot_token
 
 
 def test_create_and_delete(team_id, channel_id, user_id):

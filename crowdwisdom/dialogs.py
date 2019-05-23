@@ -1,5 +1,5 @@
-from plots import pie_lots, bar_plots
-from settings import settings_info
+from . plots import pie_lots, bar_plots
+from . settings import settings_info
 
 
 # ========== general ===========

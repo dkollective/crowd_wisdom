@@ -2,8 +2,8 @@
 import json
 from threading import Thread
 
-from model import create_group_prediction, action_handler, submission_handler
-from interface import oauth, auth_team
+from . model import create_group_prediction, action_handler, submission_handler
+from . interface import oauth, auth_team
 from flask import Flask, request, make_response, render_template, send_from_directory
 
 app = Flask(__name__, static_url_path='')
@@ -118,6 +118,9 @@ def predict():
     thread.start()
     return ('', 200)
 
+def run():
+    app.run(debug=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
+

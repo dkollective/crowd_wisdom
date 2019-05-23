@@ -3,5 +3,5 @@
 
 . /appenv/bin/activate
 
-exec "$@" /var/log/log.log
+exec "$@"
 

@@ -6,7 +6,7 @@ RUN apt-get -y update
 
 RUN apt-get -y update && apt-get install -qyy \
    -o APT::Install-Recommends=false -o APT::Install-Suggests=false \
-   vim htop postgresql-client software-properties-common libpq-dev \
+   vim htop software-properties-common libpq-dev \
    libblas-dev liblapack-dev gfortran curl apt-utils wget build-essential \
    pkg-config rsync openssh-client libhdf5-dev libatlas3-base libjpeg8 \
    libtiff5 libfreetype6-dev

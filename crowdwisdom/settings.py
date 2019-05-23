@@ -1,5 +1,3 @@
-
-
 def _create_text_input(name, label, value, number, optional):
     return {
         "label": label,
